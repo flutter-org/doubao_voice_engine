@@ -169,14 +169,14 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
 
         let ret: SEEngineErrorCode
         if dataStr.isEmpty {
-            ret = engine.sendDirective(directive)
+            ret = engine.send(directive)
         } else {
-            ret = engine.sendDirective(directive, data: dataStr)
+            ret = engine.send(directive, data: dataStr)
         }
 
         if ret != SENoError {
             result(FlutterError(code: "DIRECTIVE_FAILED",
-                                message: "sendDirective returned \(ret.rawValue)",
+                                message: "send returned \(ret.rawValue)",
                                 details: nil))
         } else {
             result(nil)
@@ -197,11 +197,13 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         let bytes = audioData.data
         let int16Count = bytes.count / 2
         var int16Array = [Int16](repeating: 0, count: int16Count)
-        _ = int16Array.withUnsafeMutableBufferPointer { buffer in
+        int16Array.withUnsafeMutableBufferPointer { buffer in
             bytes.copyBytes(to: buffer)
         }
 
-        let ret = engine.feedAudio(int16Array, length: Int32(int16Count))
+        let ret = int16Array.withUnsafeMutableBufferPointer { buffer in
+            engine.feedAudio(buffer.baseAddress!, length: Int32(int16Count))
+        }
         result(Int(ret.rawValue))
     }
 
@@ -215,7 +217,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         }
         // 异步执行以避免回调线程死锁
         DispatchQueue.global().async {
-            _ = engine.sendDirective(SEDirectiveSyncStopEngine)
+            _ = engine.send(SEDirectiveSyncStopEngine)
             DispatchQueue.main.async {
                 result(nil)
             }
@@ -233,8 +235,8 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
     private func destroyEngineInternal() {
         guard let engine = speechEngine else { return }
         DispatchQueue.global().async {
-            _ = engine.sendDirective(SEDirectiveSyncStopEngine)
-            engine.destroyEngine()
+            _ = engine.send(SEDirectiveSyncStopEngine)
+            engine.destroy()
         }
         speechEngine = nil
     }
@@ -274,7 +276,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         case "DIRECTIVE_RESUME_PLAYER":              return SEDirectiveResumePlayer
         case "DIRECTIVE_PAUSE_RECORDER":             return SEDirectivePauseRecorder
         case "DIRECTIVE_RESUME_RECORDER":            return SEDirectiveResumeRecorder
-        default: return SEDirective(rawValue: name) ?? SEDirectiveSyncStopEngine
+        default: return SEDirectiveSyncStopEngine
         }
     }
 
