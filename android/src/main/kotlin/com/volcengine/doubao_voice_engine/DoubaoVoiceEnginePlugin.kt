@@ -3,6 +3,7 @@ package com.volcengine.doubao_voice_engine
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.annotation.NonNull
 import com.bytedance.speech.speechengine.SpeechEngine
 import com.bytedance.speech.speechengine.SpeechEngineDefines
@@ -24,6 +25,10 @@ class DoubaoVoiceEnginePlugin : FlutterPlugin, MethodCallHandler {
     private var speechEngine: SpeechEngine? = null
     private var applicationContext: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    companion object {
+        private const val TAG = "DoubaoVoice"
+    }
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         applicationContext = flutterPluginBinding.applicationContext
@@ -80,7 +85,7 @@ class DoubaoVoiceEnginePlugin : FlutterPlugin, MethodCallHandler {
                 applicationContext,
                 applicationContext
             )
-            result.success(null)
+            result.success(true) // 必须返回 true，Dart 层用 invokeMethod<bool> 判断
         } catch (e: Exception) {
             result.error("PREPARE_FAILED", e.message, null)
         }
@@ -113,11 +118,21 @@ class DoubaoVoiceEnginePlugin : FlutterPlugin, MethodCallHandler {
         params.forEach { (key, value) ->
             val keyStr = key.toString()
             when (value) {
-                is String -> engine.setOptionString(keyStr, value)
-                is Boolean -> engine.setOptionBoolean(keyStr, value)
-                is Int -> engine.setOptionInt(keyStr, value)
+                is String -> {
+                    Log.d(TAG, "configure STRING  $keyStr = $value")
+                    engine.setOptionString(keyStr, value)
+                }
+                is Boolean -> {
+                    Log.d(TAG, "configure BOOL    $keyStr = $value")
+                    engine.setOptionBoolean(keyStr, value)
+                }
+                is Int -> {
+                    Log.d(TAG, "configure INT     $keyStr = $value")
+                    engine.setOptionInt(keyStr, value)
+                }
             }
         }
+        Log.d(TAG, "configure done — ${params.size} params set")
         result.success(null)
     }
 
@@ -152,8 +167,10 @@ class DoubaoVoiceEnginePlugin : FlutterPlugin, MethodCallHandler {
         val engine = requireEngine(result) ?: return
         val ret = engine.initEngine()
         if (ret != SpeechEngineDefines.ERR_NO_ERROR) {
+            Log.e(TAG, "initEngine FAILED — error code: $ret")
             result.success(ret) // 返回错误码给 Dart 层处理
         } else {
+            Log.d(TAG, "initEngine SUCCESS")
             engine.setContext(applicationContext)
             engine.setListener(speechListener)
             result.success(0)

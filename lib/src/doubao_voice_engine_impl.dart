@@ -168,7 +168,14 @@ class DoubaoVoiceEngine {
   /// 批量配置引擎参数。
   /// 与 [setOptionString]/[setOptionInt]/[setOptionBool] 二选一使用。
   Future<void> configure(VoiceEngineConfig config) async {
-    await _channel.invokeMethod('configure', config.toParamMap());
+    final paramMap = config.toParamMap();
+    debugPrint('DoubaoVoiceEngine: configure() — ${paramMap.length} params');
+    // 脱敏打印关键鉴权参数
+    final safeMap = Map<String, dynamic>.from(paramMap);
+    safeMap['PARAMS_KEY_APP_KEY_STRING'] = '***';
+    safeMap['PARAMS_KEY_APP_TOKEN_STRING'] = '***';
+    debugPrint('DoubaoVoiceEngine: params = $safeMap');
+    await _channel.invokeMethod('configure', paramMap);
   }
 
   /// 设置字符串参数
@@ -202,8 +209,11 @@ class DoubaoVoiceEngine {
   /// 初始化引擎实例。
   /// 调用前需完成参数配置。
   Future<void> initEngine() async {
+    debugPrint('DoubaoVoiceEngine: calling initEngine...');
     final result = await _channel.invokeMethod<int>(methodInitEngine);
+    debugPrint('DoubaoVoiceEngine: initEngine returned $result');
     if (result != null && result != 0) {
+      debugPrint('DoubaoVoiceEngine: INIT FAILED with code $result');
       final tips = _buildInitErrorTips(result);
       throw PlatformException(
         code: 'INIT_FAILED',

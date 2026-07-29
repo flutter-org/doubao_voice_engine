@@ -65,6 +65,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
     // ============================================================
     private func handlePrepareEnvironment(result: @escaping FlutterResult) {
         let ok = SpeechEngine.prepareEnvironment()
+        NSLog("[DoubaoVoice] prepareEnvironment -> %@", ok ? "OK" : "FAILED")
         result(ok)
     }
 
@@ -90,15 +91,22 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
 
         for (key, value) in params {
             if let stringValue = value as? String {
+                NSLog("[DoubaoVoice] configure STRING  %@ = %@", key, stringValue)
                 engine.setStringParam(stringValue, forKey: key)
-            } else if let boolValue = value as? Bool {
-                engine.setBoolParam(boolValue, forKey: key)
             } else if let numberValue = value as? NSNumber {
-                // Flutter 传过来的 int 在 iOS 侧是 NSNumber，
-                // 用 NSNumber 比 as? Int 更稳健（兼容 Int64 等不同宽度）
-                engine.setIntParam(numberValue.intValue, forKey: key)
+                // Flutter 传过来的 bool / int 在 iOS 侧都是 NSNumber。
+                // ⚠️ 关键：必须用 CFGetTypeID 区分 CFBoolean 和普通数值 NSNumber，
+                // 否则 (0 as NSNumber) as? Bool → false，所有 int=0 的参数都会被错误当成 Bool。
+                if CFGetTypeID(numberValue) == CFBooleanGetTypeID() {
+                    NSLog("[DoubaoVoice] configure BOOL    %@ = %@", key, numberValue.boolValue ? "true" : "false")
+                    engine.setBoolParam(numberValue.boolValue, forKey: key)
+                } else {
+                    NSLog("[DoubaoVoice] configure INT     %@ = %d", key, numberValue.intValue)
+                    engine.setIntParam(numberValue.intValue, forKey: key)
+                }
             }
         }
+        NSLog("[DoubaoVoice] configure done — %d params set", params.count)
         result(nil)
     }
 
@@ -148,8 +156,10 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         guard let engine = requireEngine(result: result) else { return }
         let ret = engine.initEngine()
         if ret.rawValue != SENoError.rawValue {
+            NSLog("[DoubaoVoice] initEngine FAILED — error code: %d (0x%X)", ret.rawValue, ret.rawValue)
             result(Int(ret.rawValue))
         } else {
+            NSLog("[DoubaoVoice] initEngine SUCCESS")
             result(0)
         }
     }
