@@ -181,6 +181,29 @@ await engine.destroyEngine();
 | `pauseRecorder()` / `resumeRecorder()` | 暂停/恢复录音 |
 | `feedAudio(buffer)` | 输入自定义 PCM 音频 |
 
+### 高级指令（VoiceDirective）
+
+| 方法 | 说明 |
+|------|------|
+| `sendDirective(directive, {data})` | 发送任意 VoiceDirective 指令，用于扩展或未封装的场景 |
+
+`VoiceDirective` 枚举值：
+
+| 枚举 | 对应 Native 指令 |
+|------|-----------------|
+| `syncStopEngine` | DIRECTIVE_SYNC_STOP_ENGINE |
+| `startEngine` | DIRECTIVE_START_ENGINE |
+| `sayHello` | DIRECTIVE_EVENT_SAY_HELLO |
+| `chatTtsText` | DIRECTIVE_DIALOG_CHAT_TTS_TEXT |
+| `useClientTriggerTts` | DIRECTIVE_DIALOG_USE_CLIENT_TRIGGER_TTS |
+| `useServerTriggerTts` | DIRECTIVE_DIALOG_USE_SERVER_TRIGGER_TTS |
+| `chatTextQuery` | DIRECTIVE_EVENT_CHAT_TEXT_QUERY |
+| `chatRagText` | DIRECTIVE_EVENT_CHAT_RAG_TEXT |
+| `clientInterrupt` | DIRECTIVE_EVENT_CLIENT_INTERRUPT |
+| `updateConfig` | DIRECTIVE_EVENT_UPDATE_CONFIG |
+| `pausePlayer` / `resumePlayer` | DIRECTIVE_PAUSE_PLAYER / DIRECTIVE_RESUME_PLAYER |
+| `pauseRecorder` / `resumeRecorder` | DIRECTIVE_PAUSE_RECORDER / DIRECTIVE_RESUME_RECORDER |
+
 ### 参数配置
 
 | 方法 | 说明 |
@@ -331,6 +354,22 @@ allprojects {
     }
 }
 ```
+
+### iOS 编译警告："does not support Swift Package Manager"
+
+```
+The following plugins do not support Swift Package Manager for ios:
+  - doubao_voice_engine
+This will become an error in a future version of Flutter.
+```
+
+这是因本插件使用 CocoaPods 集成原生 SDK，尚未适配 Swift Package Manager。目前仅是一个警告，不影响编译和运行。未来版本的 Flutter 可能将其升级为错误，届时需要更新插件以支持 SPM。
+
+### iOS SDK API 兼容性
+
+本插件内部已适配豆包语音 iOS SDK 最新 API 命名（`send`、`destroy`、`onMessage(with:andData:)` 等），你只需使用 Flutter 层的 `DoubaoVoiceEngine` 公开 API，无需关心 Native SDK 版本差异。
+
+如需查看或修改 Native 层实现，参见 `ios/Classes/DoubaoVoiceEnginePlugin.swift`。
 
 ## License
 
