@@ -93,8 +93,10 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
                 engine.setStringParam(stringValue, forKey: key)
             } else if let boolValue = value as? Bool {
                 engine.setBoolParam(boolValue, forKey: key)
-            } else if let intValue = value as? Int {
-                engine.setIntParam(intValue, forKey: key)
+            } else if let numberValue = value as? NSNumber {
+                // Flutter 传过来的 int 在 iOS 侧是 NSNumber，
+                // 用 NSNumber 比 as? Int 更稳健（兼容 Int64 等不同宽度）
+                engine.setIntParam(numberValue.intValue, forKey: key)
             }
         }
         result(nil)

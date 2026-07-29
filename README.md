@@ -365,6 +365,84 @@ This will become an error in a future version of Flutter.
 
 这是因本插件使用 CocoaPods 集成原生 SDK，尚未适配 Swift Package Manager。目前仅是一个警告，不影响编译和运行。未来版本的 Flutter 可能将其升级为错误，届时需要更新插件以支持 SPM。
 
+### `initEngine()` 返回错误码 -202
+
+```
+PlatformException (INIT_FAILED, 引擎初始化失败，错误码: -202, ...)
+```
+
+错误码 -202 未在官方公开文档中列出，通常表示**初始化环境未正确准备**或**必需参数缺失/类型错误**。
+
+**排查步骤：**
+
+**1. 启用 SDK TRACE 日志**
+
+SDK 会在本地生成 `speech_sdk.log`，其中的错误信息比返回码更具体。
+
+```dart
+final engine = DoubaoVoiceEngine.instance;
+await engine.prepareEnvironment();
+await engine.createEngine();
+// 在 configure 前手动设置日志级别为 TRACE
+await engine.setOptionString('PARAMS_KEY_LOG_LEVEL_STRING', 'LOG_LEVEL_TRACE');
+await engine.setOptionString('PARAMS_KEY_DEBUG_PATH_STRING', '/path/to/writable/dir');
+await engine.configure(VoiceEngineConfig(
+  appId: 'YOUR_APP_ID',
+  appKey: 'YOUR_APP_KEY',
+  appToken: 'YOUR_ACCESS_TOKEN',
+  uid: 'test_user_001',
+  // ...其他参数
+));
+await engine.initEngine();
+```
+
+运行后检查 `speech_sdk.log`，搜索 `error` 或 `fail` 关键字获取更详细的错误信息。
+
+**2. 检查必需参数完整性**
+
+下列参数在 `initEngine()` 之前**必须全部正确设置**：
+
+| 参数 Key | 说明 | 示例值 |
+|---------|------|--------|
+| `PARAMS_KEY_ENGINE_NAME_STRING` | 引擎类型 | `dialog_engine` |
+| `PARAMS_KEY_APP_ID_STRING` | 火山引擎 AppID | 从控制台获取 |
+| `PARAMS_KEY_APP_KEY_STRING` | 火山引擎 AppKey | 从控制台获取 |
+| `PARAMS_KEY_APP_TOKEN_STRING` | Access Token | 从控制台获取 |
+| `PARAMS_KEY_RESOURCE_ID_STRING` | 对话服务资源 ID | `volc.speech.dialog` |
+| `PARAMS_KEY_UID_STRING` | 用户标识 | 任意非空字符串 |
+| `PARAMS_KEY_DIALOG_ADDRESS_STRING` | 服务地址 | `wss://openspeech.bytedance.com` |
+| `PARAMS_KEY_DIALOG_URI_STRING` | 服务 URI | `/api/v3/realtime/dialogue` |
+
+**3. 确认 Token 格式**
+
+不同服务的 Token 格式要求不同。确认你的 Token 是否需要 `Bearer;` 前缀：
+
+- 端到端对话 SDK：**不需要** `Bearer;` 前缀，直接传入原始 Token
+- 在线 TTS/ASR SDK：需要 `Bearer;{TOKEN}` 格式
+
+**4. 确认调用顺序**
+
+```dart
+// ✅ 正确顺序
+await engine.prepareEnvironment();  // 必须最先调用
+await engine.createEngine();         // 第二步
+await engine.configure(config);      // 第三步：设置所有必需参数
+await engine.initEngine();           // 第四步：初始化
+
+// ❌ 错误：未调用 configure
+await engine.prepareEnvironment();
+await engine.createEngine();
+await engine.initEngine();  // 报错！没有任何参数被设置
+```
+
+**5. 验证参数值来源**
+
+确保 `appId`、`appKey`、`appToken` 是从火山引擎控制台复制的**有效凭证**，不是示例占位符。已过期或被禁用的 Token 也会导致初始化失败。
+
+**6. iOS 额外检查**
+
+如果以上步骤都确认无误，可在 Xcode 中设置断点在 `DoubaoVoiceEnginePlugin.swift` 的 `handleConfigure` 方法，检查 `params` 中的所有键值对是否完整传入。
+
 ### iOS SDK API 兼容性
 
 本插件内部已适配豆包语音 iOS SDK 最新 API 命名（`send`、`destroy`、`onMessage(with:andData:)` 等），你只需使用 Flutter 层的 `DoubaoVoiceEngine` 公开 API，无需关心 Native SDK 版本差异。

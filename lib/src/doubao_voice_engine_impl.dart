@@ -137,7 +137,17 @@ class DoubaoVoiceEngine {
   /// 初始化环境依赖，创建引擎实例前调用。
   /// 整个 App 生命周期内**仅需执行一次**。
   Future<void> prepareEnvironment() async {
-    await _channel.invokeMethod(methodPrepareEnvironment);
+    final ok = await _channel.invokeMethod<bool>(methodPrepareEnvironment);
+    if (ok != true) {
+      throw PlatformException(
+        code: 'PREPARE_FAILED',
+        message: '环境准备失败。请检查：\n'
+            '1. App 是否已完成火山引擎鉴权配置\n'
+            '2. 网络权限是否已开启\n'
+            '3. iOS: pod install 是否使用了 --repo-update\n'
+            '4. Android: AndroidManifest.xml 是否声明了 INTERNET 权限',
+      );
+    }
   }
 
   // ============================================================
@@ -194,12 +204,26 @@ class DoubaoVoiceEngine {
   Future<void> initEngine() async {
     final result = await _channel.invokeMethod<int>(methodInitEngine);
     if (result != null && result != 0) {
+      final tips = _buildInitErrorTips(result);
       throw PlatformException(
         code: 'INIT_FAILED',
-        message: '引擎初始化失败，错误码: $result',
+        message: '引擎初始化失败，错误码: $result\n$tips',
       );
     }
     _isInitialized = true;
+  }
+
+  /// 根据错误码生成排查建议
+  String _buildInitErrorTips(int errorCode) {
+    final tips = StringBuffer();
+    tips.writeln('排查建议：');
+    tips.writeln('1. 检查 configure() 是否正确传入了 appId / appKey / appToken');
+    tips.writeln('2. 确认 resourceId 应为 "volc.speech.dialog"');
+    tips.writeln('3. 确认 uid 不为空字符串');
+    tips.writeln('4. 设置 logLevel 为 "LOG_LEVEL_TRACE" 以获取 SDK 详细日志');
+    tips.writeln('5. 查看设备上的 speech_sdk.log 文件获取原始错误信息');
+    tips.writeln('6. 参考 README 常见问题 → "initEngine 返回 -202 错误"');
+    return tips.toString();
   }
 
   // ============================================================
