@@ -1,3 +1,5 @@
+import 'voice_engine_defines.dart';
+
 /// 引擎配置数据模型
 class VoiceEngineConfig {
   // ---- 必需配置 ----

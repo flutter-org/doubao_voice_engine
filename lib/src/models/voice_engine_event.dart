@@ -1,3 +1,5 @@
+import 'voice_engine_defines.dart';
+
 /// 引擎事件数据模型
 class VoiceEngineEvent {
   /// 事件类型

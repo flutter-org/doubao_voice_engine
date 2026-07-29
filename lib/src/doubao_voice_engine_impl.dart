@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 
-import '../models/voice_engine_config.dart';
-import '../models/voice_engine_defines.dart';
-import '../models/voice_engine_event.dart';
+import 'models/voice_engine_config.dart';
+import 'models/voice_engine_defines.dart';
+import 'models/voice_engine_event.dart';
 
 /// 豆包语音端到端实时语音大模型 Flutter 插件
 ///
@@ -66,6 +66,17 @@ class DoubaoVoiceEngine {
 
   static const String _methodChannelName = 'doubao_voice_engine/method';
   static const String _eventChannelName = 'doubao_voice_engine/event';
+
+  // Method names
+  static const String methodPrepareEnvironment = 'prepareEnvironment';
+  static const String methodCreateEngine = 'createEngine';
+  static const String methodSetOptionString = 'setOptionString';
+  static const String methodSetOptionBool = 'setOptionBool';
+  static const String methodSetOptionInt = 'setOptionInt';
+  static const String methodInitEngine = 'initEngine';
+  static const String methodSendDirective = 'sendDirective';
+  static const String methodFeedAudio = 'feedAudio';
+  static const String methodDestroyEngine = 'destroyEngine';
 
   MethodChannel? _methodChannel;
   EventChannel? _eventChannel;
@@ -374,7 +385,7 @@ class DoubaoVoiceEngine {
     if (value is String) return _escapeJson(value);
     if (value is bool) return value.toString();
     if (value is num) return value.toString();
-    if (value is Map) return _toJson(value);
+    if (value is Map) return _toJson(value.cast<String, dynamic>());
     return 'null';
   }
 }
