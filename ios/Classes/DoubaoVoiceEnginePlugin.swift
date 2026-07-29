@@ -258,7 +258,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
     // ============================================================
     // Directive 字符串 → 枚举 映射
     // ============================================================
-    private func resolveDirective(_ name: String) -> String {
+    private func resolveDirective(_ name: String) -> SEDirective {
         switch name {
         case "DIRECTIVE_SYNC_STOP_ENGINE":           return SEDirectiveSyncStopEngine
         case "DIRECTIVE_START_ENGINE":               return SEDirectiveStartEngine
@@ -274,7 +274,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         case "DIRECTIVE_RESUME_PLAYER":              return SEDirectiveResumePlayer
         case "DIRECTIVE_PAUSE_RECORDER":             return SEDirectivePauseRecorder
         case "DIRECTIVE_RESUME_RECORDER":            return SEDirectiveResumeRecorder
-        default: return name
+        default: return SEDirective(rawValue: name) ?? SEDirectiveSyncStopEngine
         }
     }
 
