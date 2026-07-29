@@ -168,6 +168,20 @@ class DoubaoVoiceEngine {
   /// 批量配置引擎参数。
   /// 与 [setOptionString]/[setOptionInt]/[setOptionBool] 二选一使用。
   Future<void> configure(VoiceEngineConfig config) async {
+    // 必需参数验证
+    final errors = <String>[];
+    if (config.appId.isEmpty) errors.add('appId 不能为空');
+    if (config.appKey.isEmpty) errors.add('appKey 不能为空');
+    if (config.appToken.isEmpty) errors.add('appToken 不能为空');
+    if (config.uid.isEmpty) errors.add('uid 不能为空');
+    if (config.resourceId.isEmpty) errors.add('resourceId 不能为空');
+    if (errors.isNotEmpty) {
+      throw PlatformException(
+        code: 'INVALID_CONFIG',
+        message: '配置参数验证失败：\n${errors.map((e) => '  - $e').join('\n')}',
+      );
+    }
+
     final paramMap = config.toParamMap();
     debugPrint('DoubaoVoiceEngine: configure() — ${paramMap.length} params');
     // 脱敏打印关键鉴权参数
@@ -227,12 +241,13 @@ class DoubaoVoiceEngine {
   String _buildInitErrorTips(int errorCode) {
     final tips = StringBuffer();
     tips.writeln('排查建议：');
-    tips.writeln('1. 检查 configure() 是否正确传入了 appId / appKey / appToken');
-    tips.writeln('2. 确认 resourceId 应为 "volc.speech.dialog"');
-    tips.writeln('3. 确认 uid 不为空字符串');
-    tips.writeln('4. 设置 logLevel 为 "LOG_LEVEL_TRACE" 以获取 SDK 详细日志');
-    tips.writeln('5. 查看设备上的 speech_sdk.log 文件获取原始错误信息');
-    tips.writeln('6. 参考 README 常见问题 → "initEngine 返回 -202 错误"');
+    tips.writeln('1. 确认 Engine Name 为 "DIALOG_ENGINE"（大写），而非 "dialog_engine"');
+    tips.writeln('2. 检查 configure() 是否正确传入了 appId / appKey / appToken');
+    tips.writeln('3. 确认 resourceId 应为 "volc.speech.dialog"');
+    tips.writeln('4. 确认 uid 不为空字符串');
+    tips.writeln('5. 设置 logLevel 为 "LOG_LEVEL_TRACE" 以获取 SDK 详细日志');
+    tips.writeln('6. 查看设备上的 speech_sdk.log 文件获取原始错误信息');
+    tips.writeln('7. 参考 README 常见问题 → "initEngine 返回 -202 错误"');
     return tips.toString();
   }
 

@@ -1,5 +1,7 @@
 /// 引擎名称
-const String dialogEngine = 'dialog_engine';
+/// ⚠️ 必须为大写 'DIALOG_ENGINE'，与 SDK 常量 SpeechEngineDefines.DIALOG_ENGINE / SE_DIALOG_ENGINE 的值一致。
+/// 之前误写为小写 'dialog_engine'，导致 SDK 找不到引擎实现，initEngine() 返回 -202。
+const String dialogEngine = 'DIALOG_ENGINE';
 
 // ============================================================
 // 参数 Key 定义（与 Native SDK 一一对应）

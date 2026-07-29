@@ -47,7 +47,7 @@ class VoiceEngineConfig {
     this.dialogAddress = 'wss://openspeech.bytedance.com',
     this.dialogUri = '/api/v3/realtime/dialogue',
     this.debugPath,
-    this.logLevel = logLevelWarn,
+    this.logLevel = logLevelTrace,
     this.enableAec = false,
     this.aecModelPath,
     this.recorderType = recorderTypeRecorder,
@@ -106,13 +106,17 @@ class VoiceEngineConfig {
       setString(paramsKeyDialogPlayerPath, playerPath!);
     }
 
-    // 工作模式
-    setInt(paramsKeyDialogWorkMode, dialogWorkMode);
+    // 工作模式（仅在非默认模式时设置，避免向 SDK 传入不必要的参数）
+    if (dialogWorkMode != dialogWorkModeDefault) {
+      setInt(paramsKeyDialogWorkMode, dialogWorkMode);
+    }
 
-    // 重采样
+    // 重采样（仅在启用时设置相关参数）
     setBool(paramsKeyEnableResampler, enableResampler);
-    setInt(paramsKeyCustomSampleRate, customSampleRate);
-    setInt(paramsKeyCustomChannel, customChannel);
+    if (enableResampler) {
+      setInt(paramsKeyCustomSampleRate, customSampleRate);
+      setInt(paramsKeyCustomChannel, customChannel);
+    }
 
     return params;
   }
