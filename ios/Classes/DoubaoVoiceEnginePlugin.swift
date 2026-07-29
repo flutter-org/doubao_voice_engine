@@ -292,7 +292,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
 // ============================================================
 extension DoubaoVoiceEnginePlugin: SpeechEngineDelegate {
 
-    public func onMessage(withType type: SEMessageType, andData data: Data) {
+    public func onMessage(with type: SEMessageType, andData data: Data) {
         switch type {
         case SEEngineStart:
             let text = String(data: data, encoding: .utf8)

@@ -21,16 +21,50 @@ dependencies:
 
 ### iOS 额外配置
 
-在 `ios/Podfile` 中添加火山引擎 CocoaPods 源：
+#### 1. 配置 Podfile
+
+`ios/Podfile` **必须**在顶部声明两个 CocoaPods 源，**火山引擎源必须在 CocoaPods 官方源之后**：
 
 ```ruby
+# 取消这两行顶部的注释，并确保都存在
 source 'https://github.com/CocoaPods/Specs.git'
 source 'https://github.com/volcengine/volcengine-specs.git'
 
+platform :ios, '12.0'
+
 target 'Runner' do
-  # ...
+  use_frameworks!
+  use_modular_headers!
+
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
+
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
 end
 ```
+
+> **重要**：Podfile 中 **必须同时包含两个 source**，且 volcengine-specs 源不可或缺。
+> `SocketRocket`、`SpeechEngineToB` 等依赖均由火山引擎源提供。
+
+#### 2. 执行 pod install
+
+首次安装或依赖版本更新时，**务必带 `--repo-update`** 参数以刷新本地 CocoaPods 索引：
+
+```bash
+cd ios && pod install --repo-update
+```
+
+如果 `--repo-update` 执行失败，先手动更新 repo 再重试：
+
+```bash
+pod repo update
+pod install
+```
+
+#### 3. 配置 Info.plist
 
 在 `ios/Runner/Info.plist` 中添加麦克风权限说明：
 
@@ -41,7 +75,7 @@ end
 
 ### Android 额外配置
 
-SDK 已通过 `AndroidManifest.xml` 声明所需权限，无需额外配置。
+SDK 已通过 `AndroidManifest.xml` 声明所需���限，无需额外配置。
 
 ## 快速开始
 
@@ -242,6 +276,61 @@ await engine.setOptionInt(paramsKeyCustomChannel, 2);
 2. `prepareEnvironment()` 在整个 App 生命周期内仅需调用一次。
 3. Android 录音权限需要在运行时申请；插件仅声明权限，应用层需自行处理权限请求。
 4. iOS 需在 `Info.plist` 中配置 `NSMicrophoneUsageDescription`。
+
+## 常见问题
+
+### pod install 报错：Unable to find a specification for SocketRocket / SpeechEngineToB
+
+```
+[!] Unable to find a specification for `SocketRocket (= 0.6.1)` depended upon by `doubao_voice_engine`
+```
+
+这个错误意味着 CocoaPods 找不到火山引擎源中的依赖。按以下步骤逐一排查：
+
+**1. 检查 Podfile 是否包含 volcengine-specs 源**
+
+确保 `ios/Podfile` **顶部**有以下两行（缺一不可）：
+
+```ruby
+source 'https://github.com/CocoaPods/Specs.git'
+source 'https://github.com/volcengine/volcengine-specs.git'
+```
+
+**2. 使用 `--repo-update` 重新安装**
+
+```bash
+cd ios && pod install --repo-update
+```
+
+**3. 如果仍然失败，手动添加 volcengine 源并更新**
+
+```bash
+pod repo add volcengine-specs https://github.com/volcengine/volcengine-specs.git
+pod repo update
+pod install
+```
+
+**4. 确认网络可达**
+
+火山引擎 CocoaPods 源托管在 GitHub，确保网络可以访问 `github.com/volcengine`。如在内网环境，可能需要配置代理：
+
+```bash
+git config --global http.proxy http://your-proxy:port
+```
+
+### Android 编译报错：找不到 speechengine_tob
+
+需要在 `android/build.gradle`（项目级）中添加火山引擎 Maven 仓库：
+
+```groovy
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        maven { url "https://artifact.bytedance.com/repository/Volcengine/" }
+    }
+}
+```
 
 ## License
 
