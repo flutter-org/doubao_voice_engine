@@ -1,0 +1,30 @@
+name: doubao_voice_engine
+description: 豆包语音端到端实时语音大模型 Flutter 插件。基于豆包端到端实时语音大模型，提供低延迟、双向流式语音交互能力。
+version: 0.0.1
+homepage: https://github.com/example/doubao_voice_engine
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.volcengine.doubao_voice_engine
+        pluginClass: DoubaoVoiceEnginePlugin
+      ios:
+        pluginClass: DoubaoVoiceEnginePlugin
+
+  # 如需在 assets 中携带 AEC 模型文件，取消注释：
+  # assets:
+  #   - assets/aec.model
