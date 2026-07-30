@@ -1,66 +1,67 @@
-/// 引擎名称
-/// ⚠️ 必须为大写 'DIALOG_ENGINE'，与 SDK 常量 SpeechEngineDefines.DIALOG_ENGINE / SE_DIALOG_ENGINE 的值一致。
-/// 之前误写为小写 'dialog_engine'，导致 SDK 找不到引擎实现，initEngine() 返回 -202。
-const String dialogEngine = 'DIALOG_ENGINE';
+/// 引擎名称（SDK 真实值 = "dialog"）
+const String dialogEngine = 'dialog';
 
 // ============================================================
-// 参数 Key 定义（与 Native SDK 一一对应）
+// 参数 Key 定义
+// ⚠️ 注意：这些是 SDK 常量的「值」（如 "appid"），而非常量的「标识符名」（如 "PARAMS_KEY_APP_ID_STRING"）。
+// 之前误将标识符名传给 SDK，所有参数被静默丢弃，导致 initEngine() 返回 -202。
+// 取自 SDK 二进制文件。
 // ============================================================
 
 /// 引擎基础配置
-const String paramsKeyEngineName = 'PARAMS_KEY_ENGINE_NAME_STRING';
-const String paramsKeyDebugPath = 'PARAMS_KEY_DEBUG_PATH_STRING';
-const String paramsKeyLogLevel = 'PARAMS_KEY_LOG_LEVEL_STRING';
+const String paramsKeyEngineName = 'engine_name';
+const String paramsKeyDebugPath = 'debug_path';
+const String paramsKeyLogLevel = 'log_level';
 
 /// 鉴权配置
-const String paramsKeyAppId = 'PARAMS_KEY_APP_ID_STRING';
-const String paramsKeyAppKey = 'PARAMS_KEY_APP_KEY_STRING';
-const String paramsKeyAppToken = 'PARAMS_KEY_APP_TOKEN_STRING';
-const String paramsKeyResourceId = 'PARAMS_KEY_RESOURCE_ID_STRING';
-const String paramsKeyUid = 'PARAMS_KEY_UID_STRING';
-const String paramsKeyDialogAddress = 'PARAMS_KEY_DIALOG_ADDRESS_STRING';
-const String paramsKeyDialogUri = 'PARAMS_KEY_DIALOG_URI_STRING';
+const String paramsKeyAppId = 'appid';
+const String paramsKeyAppKey = 'appkey';
+const String paramsKeyAppToken = 'token';
+const String paramsKeyResourceId = 'resource_id';
+const String paramsKeyUid = 'uid';
+const String paramsKeyDialogAddress = 'dialog_address';
+const String paramsKeyDialogUri = 'dialog_uri';
 
 /// AEC 回声消除
-const String paramsKeyEnableAec = 'PARAMS_KEY_ENABLE_AEC_BOOL';
-const String paramsKeyAecModelPath = 'PARAMS_KEY_AEC_MODEL_PATH_STRING';
+const String paramsKeyEnableAec = 'enable_aec';
+const String paramsKeyAecModelPath = 'aec_model_path';
 
 /// 录音机 & 输入音频
-const String paramsKeyRecorderType = 'PARAMS_KEY_RECORDER_TYPE_STRING';
-const String paramsKeyDialogRecorderPath = 'PARAMS_KEY_DIALOG_RECORDER_PATH_STRING';
+const String paramsKeyRecorderType = 'recorder_data_source_type';
+const String paramsKeyDialogRecorderPath = 'dialog_recorder_path';
 const String paramsKeyEnableRecorderAudioCallback =
-    'PARAMS_KEY_DIALOG_ENABLE_RECORDER_AUDIO_CALLBACK_BOOL';
+    'dialog_enable_recorder_audio_callback';
 
 /// 播放器 & 输出音频
-const String paramsKeyEnablePlayer = 'PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL';
+const String paramsKeyEnablePlayer = 'dialog_enable_player';
 const String paramsKeyEnablePlayerAudioCallback =
-    'PARAMS_KEY_DIALOG_ENABLE_PLAYER_AUDIO_CALLBACK_BOOL';
+    'dialog_enable_player_audio_callback';
 const String paramsKeyEnableDecoderAudioCallback =
-    'PARAMS_KEY_DIALOG_ENABLE_DECODER_AUDIO_CALLBACK_BOOL';
-const String paramsKeyDialogPlayerPath = 'PARAMS_KEY_DIALOG_PLAYER_PATH_STRING';
+    'dialog_enable_decoder_audio_callback';
+const String paramsKeyDialogPlayerPath = 'dialog_player_path';
 
 /// 工作模式
-const String paramsKeyDialogWorkMode = 'PARAMS_KEY_DIALOG_WORK_MODE_INT';
+const String paramsKeyDialogWorkMode = 'dialog_work_mode';
 
 /// 自定义音频重采样
-const String paramsKeyEnableResampler = 'PARAMS_KEY_ENABLE_RESAMPLER_BOOL';
-const String paramsKeyCustomSampleRate = 'PARAMS_KEY_CUSTOM_SAMPLE_RATE_INT';
-const String paramsKeyCustomChannel = 'PARAMS_KEY_CUSTOM_CHANNEL_INT';
+const String paramsKeyEnableResampler = 'enable_resampler';
+const String paramsKeyCustomSampleRate = 'custom_sample_rate';
+const String paramsKeyCustomChannel = 'custom_channel';
 
 // ============================================================
-// 枚举值
+// 枚举值（SDK 真实取值）
 // ============================================================
 
-/// 录音类型
-const String recorderTypeRecorder = 'RECORDER_TYPE_RECORDER';
-const String recorderTypeStream = 'RECORDER_TYPE_STREAM';
+/// 录音类型（SDK 真实值）
+const String recorderTypeRecorder = 'Recorder';
+const String recorderTypeStream = 'Stream';
 
-/// 日志级别
-const String logLevelTrace = 'LOG_LEVEL_TRACE';
-const String logLevelDebug = 'LOG_LEVEL_DEBUG';
-const String logLevelInfo = 'LOG_LEVEL_INFO';
-const String logLevelWarn = 'LOG_LEVEL_WARN';
-const String logLevelError = 'LOG_LEVEL_ERROR';
+/// 日志级别（SDK 真实值）
+const String logLevelTrace = 'TRACE';
+const String logLevelDebug = 'DEBUG';
+const String logLevelInfo = 'INFO';
+const String logLevelWarn = 'WARN';
+const String logLevelError = 'ERROR';
 
 /// 工作模式
 const int dialogWorkModeDefault = 0;

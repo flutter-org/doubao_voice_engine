@@ -76,71 +76,111 @@ class DoubaoVoiceEnginePlugin : FlutterPlugin, DoubaoVoiceHostApi {
         Log.d(TAG, "createEngine -> OK")
     }
 
+    // ============================================================
+    // SDK 参数 key → 真实值映射
+    // 取值自 SDK 二进制，常量的「值」而非「标识符名」。
+    // 之前误将 "PARAMS_KEY_APP_ID_STRING"（标识符名）当作 key 传给 SDK，
+    // SDK 不认识这些 key，所有参数被静默丢弃，导致 initEngine() 返回 -202。
+    // ============================================================
+    private object SDKKey {
+        const val ENGINE_NAME                  = "engine_name"
+        const val LOG_LEVEL                    = "log_level"
+        const val DEBUG_PATH                   = "debug_path"
+        const val APP_ID                       = "appid"
+        const val APP_KEY                      = "appkey"
+        const val APP_TOKEN                    = "token"
+        const val RESOURCE_ID                  = "resource_id"
+        const val UID                          = "uid"
+        const val DIALOG_ADDRESS               = "dialog_address"
+        const val DIALOG_URI                   = "dialog_uri"
+        const val ENABLE_AEC                   = "enable_aec"
+        const val AEC_MODEL_PATH               = "aec_model_path"
+        const val RECORDER_DATA_SOURCE_TYPE    = "recorder_data_source_type"
+        const val DIALOG_RECORDER_PATH         = "dialog_recorder_path"
+        const val DIALOG_ENABLE_RECORDER_AUDIO_CB = "dialog_enable_recorder_audio_callback"
+        const val DIALOG_ENABLE_PLAYER         = "dialog_enable_player"
+        const val DIALOG_ENABLE_PLAYER_AUDIO_CB   = "dialog_enable_player_audio_callback"
+        const val DIALOG_ENABLE_DECODER_AUDIO_CB  = "dialog_enable_decoder_audio_callback"
+        const val DIALOG_PLAYER_PATH           = "dialog_player_path"
+        const val DIALOG_WORK_MODE             = "dialog_work_mode"
+        const val ENABLE_RESAMPLER             = "enable_resampler"
+        const val CUSTOM_SAMPLE_RATE           = "custom_sample_rate"
+        const val CUSTOM_CHANNEL               = "custom_channel"
+    }
+
+    private object SDKValue {
+        const val ENGINE_DIALOG        = "dialog"
+        const val RECORDER_TYPE_RECORDER = "Recorder"
+        const val RECORDER_TYPE_STREAM   = "Stream"
+        const val LOG_LEVEL_TRACE       = "TRACE"
+    }
+
     override fun configure(config: EngineConfigMessage) {
         val engine = speechEngine ?: throw IllegalStateException("请先调用 createEngine()")
 
         // 引擎基础
-        engine.setOptionString("PARAMS_KEY_ENGINE_NAME_STRING", "DIALOG_ENGINE")
-        engine.setOptionString("PARAMS_KEY_LOG_LEVEL_STRING", config.logLevel)
-        config.debugPath?.let { engine.setOptionString("PARAMS_KEY_DEBUG_PATH_STRING", it) }
+        engine.setOptionString(SDKKey.ENGINE_NAME, SDKValue.ENGINE_DIALOG)
+        Log.d(TAG, "configure STRING  engine_name        = dialog")
+        engine.setOptionString(SDKKey.LOG_LEVEL, config.logLevel)
+        config.debugPath?.let { engine.setOptionString(SDKKey.DEBUG_PATH, it) }
 
         // 鉴权
-        Log.d(TAG, "configure STRING  PARAMS_KEY_APP_ID_STRING = ${config.appId}")
-        engine.setOptionString("PARAMS_KEY_APP_ID_STRING", config.appId)
-        engine.setOptionString("PARAMS_KEY_APP_KEY_STRING", config.appKey)
-        engine.setOptionString("PARAMS_KEY_APP_TOKEN_STRING", config.appToken)
-        engine.setOptionString("PARAMS_KEY_RESOURCE_ID_STRING", config.resourceId)
-        Log.d(TAG, "configure STRING  PARAMS_KEY_RESOURCE_ID_STRING = ${config.resourceId}")
-        engine.setOptionString("PARAMS_KEY_UID_STRING", config.uid)
-        engine.setOptionString("PARAMS_KEY_DIALOG_ADDRESS_STRING", config.dialogAddress)
-        engine.setOptionString("PARAMS_KEY_DIALOG_URI_STRING", config.dialogUri)
+        Log.d(TAG, "configure STRING  appid              = ${config.appId}")
+        engine.setOptionString(SDKKey.APP_ID, config.appId)
+        engine.setOptionString(SDKKey.APP_KEY, config.appKey)
+        engine.setOptionString(SDKKey.APP_TOKEN, config.appToken)
+        engine.setOptionString(SDKKey.RESOURCE_ID, config.resourceId)
+        Log.d(TAG, "configure STRING  resource_id        = ${config.resourceId}")
+        engine.setOptionString(SDKKey.UID, config.uid)
+        engine.setOptionString(SDKKey.DIALOG_ADDRESS, config.dialogAddress)
+        engine.setOptionString(SDKKey.DIALOG_URI, config.dialogUri)
 
         // AEC
-        Log.d(TAG, "configure BOOL    PARAMS_KEY_ENABLE_AEC_BOOL = ${config.enableAec}")
-        engine.setOptionBoolean("PARAMS_KEY_ENABLE_AEC_BOOL", config.enableAec)
+        Log.d(TAG, "configure BOOL    enable_aec         = ${config.enableAec}")
+        engine.setOptionBoolean(SDKKey.ENABLE_AEC, config.enableAec)
         if (config.enableAec && config.aecModelPath != null) {
-            engine.setOptionString("PARAMS_KEY_AEC_MODEL_PATH_STRING", config.aecModelPath)
+            engine.setOptionString(SDKKey.AEC_MODEL_PATH, config.aecModelPath)
         }
 
         // 录音机
-        engine.setOptionString("PARAMS_KEY_RECORDER_TYPE_STRING", config.recorderType)
+        engine.setOptionString(SDKKey.RECORDER_DATA_SOURCE_TYPE, config.recorderType)
         config.recorderPath?.let {
-            engine.setOptionString("PARAMS_KEY_DIALOG_RECORDER_PATH_STRING", it)
+            engine.setOptionString(SDKKey.DIALOG_RECORDER_PATH, it)
         }
         engine.setOptionBoolean(
-            "PARAMS_KEY_DIALOG_ENABLE_RECORDER_AUDIO_CALLBACK_BOOL",
+            SDKKey.DIALOG_ENABLE_RECORDER_AUDIO_CB,
             config.enableRecorderAudioCallback
         )
 
         // 播放器
-        Log.d(TAG, "configure BOOL    PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL = ${config.enablePlayer}")
-        engine.setOptionBoolean("PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL", config.enablePlayer)
+        Log.d(TAG, "configure BOOL    dialog_enable_player = ${config.enablePlayer}")
+        engine.setOptionBoolean(SDKKey.DIALOG_ENABLE_PLAYER, config.enablePlayer)
         engine.setOptionBoolean(
-            "PARAMS_KEY_DIALOG_ENABLE_PLAYER_AUDIO_CALLBACK_BOOL",
+            SDKKey.DIALOG_ENABLE_PLAYER_AUDIO_CB,
             config.enablePlayerAudioCallback
         )
         engine.setOptionBoolean(
-            "PARAMS_KEY_DIALOG_ENABLE_DECODER_AUDIO_CALLBACK_BOOL",
+            SDKKey.DIALOG_ENABLE_DECODER_AUDIO_CB,
             config.enableDecoderAudioCallback
         )
         config.playerPath?.let {
-            engine.setOptionString("PARAMS_KEY_DIALOG_PLAYER_PATH_STRING", it)
+            engine.setOptionString(SDKKey.DIALOG_PLAYER_PATH, it)
         }
 
         // 工作模式（仅在非默认模式时设置）
         config.dialogWorkMode?.let {
-            Log.d(TAG, "configure INT     PARAMS_KEY_DIALOG_WORK_MODE_INT = $it")
-            engine.setOptionInt("PARAMS_KEY_DIALOG_WORK_MODE_INT", it)
+            Log.d(TAG, "configure INT     dialog_work_mode   = $it")
+            engine.setOptionInt(SDKKey.DIALOG_WORK_MODE, it)
         }
 
         // 重采样
-        engine.setOptionBoolean("PARAMS_KEY_ENABLE_RESAMPLER_BOOL", config.enableResampler)
+        engine.setOptionBoolean(SDKKey.ENABLE_RESAMPLER, config.enableResampler)
         if (config.enableResampler) {
             config.customSampleRate?.let {
-                engine.setOptionInt("PARAMS_KEY_CUSTOM_SAMPLE_RATE_INT", it)
+                engine.setOptionInt(SDKKey.CUSTOM_SAMPLE_RATE, it)
             }
             config.customChannel?.let {
-                engine.setOptionInt("PARAMS_KEY_CUSTOM_CHANNEL_INT", it)
+                engine.setOptionInt(SDKKey.CUSTOM_CHANNEL, it)
             }
         }
 

@@ -250,13 +250,15 @@ class DoubaoVoiceEngine implements DoubaoVoiceFlutterApi {
   String _buildInitErrorTips(int errorCode) {
     final tips = StringBuffer();
     tips.writeln('排查建议：');
-    tips.writeln('1. 确认 Engine Name 为 "DIALOG_ENGINE"（大写），而非 "dialog_engine"');
-    tips.writeln('2. 检查 configure() 是否正确传入了 appId / appKey / appToken');
-    tips.writeln('3. 确认 resourceId 应为 "volc.speech.dialog"');
-    tips.writeln('4. 确认 uid 不为空字符串');
-    tips.writeln('5. 设置 logLevel 为 "LOG_LEVEL_TRACE" 以获取 SDK 详细日志');
-    tips.writeln('6. 查看设备上的 speech_sdk.log 文件获取原始错误信息');
-    tips.writeln('7. 参考 README 常见问题 → "initEngine 返回 -202 错误"');
+    tips.writeln('1. 确认 Engine Name 为 "dialog"（小写），而非 "DIALOG_ENGINE"');
+    tips.writeln('2. 参数 key 必须是 SDK 常量值（如 "appid"），而非标识符名（如 "PARAMS_KEY_APP_ID_STRING"）');
+    tips.writeln('3. 推荐使用 configure()，避免手动 setOptionString 传错 key');
+    tips.writeln('4. 检查 configure() 是否正确传入了 appId / appKey / appToken');
+    tips.writeln('5. 确认 resourceId 应为 "volc.speech.dialog"');
+    tips.writeln('6. 确认 uid 不为空字符串');
+    tips.writeln('7. 设置 logLevel 为 "TRACE"（不是 "LOG_LEVEL_TRACE"）以获取 SDK 详细日志');
+    tips.writeln('8. 查看设备上的 speech_sdk.log 文件获取原始错误信息');
+    tips.writeln('9. 参考 README 常见问题 → "initEngine 返回 -202 错误"');
     return tips.toString();
   }
 

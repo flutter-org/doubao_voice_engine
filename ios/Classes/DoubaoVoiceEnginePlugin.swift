@@ -49,67 +49,106 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin, DoubaoVoiceHostAp
         NSLog("[DoubaoVoice] createEngine -> OK")
     }
 
+    /// SDK 参数 key → 真实值映射表
+    /// 取值自 SDK 二进制，常量的「值」而非「标识符名」。
+    /// 之前误将 "PARAMS_KEY_APP_ID_STRING"（标识符名）当作 key 传给 SDK，
+    /// SDK 不认识这些 key，所有参数被静默丢弃，导致 initEngine() 返回 -202。
+    private enum SDKKey {
+        static let engineName                  = "engine_name"
+        static let logLevel                    = "log_level"
+        static let debugPath                   = "debug_path"
+        static let appId                       = "appid"
+        static let appKey                      = "appkey"
+        static let appToken                    = "token"
+        static let resourceId                  = "resource_id"
+        static let uid                         = "uid"
+        static let dialogAddress               = "dialog_address"
+        static let dialogUri                   = "dialog_uri"
+        static let enableAec                   = "enable_aec"
+        static let aecModelPath                = "aec_model_path"
+        static let recorderDataSourceType      = "recorder_data_source_type"
+        static let dialogRecorderPath          = "dialog_recorder_path"
+        static let dialogEnableRecorderAudioCB = "dialog_enable_recorder_audio_callback"
+        static let dialogEnablePlayer          = "dialog_enable_player"
+        static let dialogEnablePlayerAudioCB   = "dialog_enable_player_audio_callback"
+        static let dialogEnableDecoderAudioCB  = "dialog_enable_decoder_audio_callback"
+        static let dialogPlayerPath            = "dialog_player_path"
+        static let dialogWorkMode              = "dialog_work_mode"
+        static let enableResampler             = "enable_resampler"
+        static let customSampleRate            = "custom_sample_rate"
+        static let customChannel               = "custom_channel"
+    }
+
+    /// SDK 枚举值映射
+    /// 与参数 key 同理，传的是常量值而非标识符名
+    private enum SDKValue {
+        static let engineDialog   = "dialog"
+        static let recorderTypeRecorder = "Recorder"
+        static let recorderTypeStream   = "Stream"
+        static let logLevelTrace  = "TRACE"
+    }
+
     func configure(config: EngineConfigMessage) throws {
         guard let engine = speechEngine else {
             throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
 
         // 引擎基础
-        engine.setStringParam("DIALOG_ENGINE", forKey: "PARAMS_KEY_ENGINE_NAME_STRING")
-        NSLog("[DoubaoVoice] configure STRING  PARAMS_KEY_ENGINE_NAME_STRING = DIALOG_ENGINE")
-        engine.setStringParam(config.logLevel, forKey: "PARAMS_KEY_LOG_LEVEL_STRING")
+        engine.setStringParam(SDKValue.engineDialog, forKey: SDKKey.engineName)
+        NSLog("[DoubaoVoice] configure STRING  engine_name        = dialog")
+        engine.setStringParam(config.logLevel, forKey: SDKKey.logLevel)
         if let debugPath = config.debugPath {
-            engine.setStringParam(debugPath, forKey: "PARAMS_KEY_DEBUG_PATH_STRING")
+            engine.setStringParam(debugPath, forKey: SDKKey.debugPath)
         }
 
         // 鉴权
-        NSLog("[DoubaoVoice] configure STRING  PARAMS_KEY_APP_ID_STRING = %@", config.appId)
-        engine.setStringParam(config.appId, forKey: "PARAMS_KEY_APP_ID_STRING")
-        engine.setStringParam(config.appKey, forKey: "PARAMS_KEY_APP_KEY_STRING")
-        engine.setStringParam(config.appToken, forKey: "PARAMS_KEY_APP_TOKEN_STRING")
-        NSLog("[DoubaoVoice] configure STRING  PARAMS_KEY_RESOURCE_ID_STRING = %@", config.resourceId)
-        engine.setStringParam(config.resourceId, forKey: "PARAMS_KEY_RESOURCE_ID_STRING")
-        engine.setStringParam(config.uid, forKey: "PARAMS_KEY_UID_STRING")
-        engine.setStringParam(config.dialogAddress, forKey: "PARAMS_KEY_DIALOG_ADDRESS_STRING")
-        engine.setStringParam(config.dialogUri, forKey: "PARAMS_KEY_DIALOG_URI_STRING")
+        NSLog("[DoubaoVoice] configure STRING  appid              = %@", config.appId)
+        engine.setStringParam(config.appId, forKey: SDKKey.appId)
+        engine.setStringParam(config.appKey, forKey: SDKKey.appKey)
+        engine.setStringParam(config.appToken, forKey: SDKKey.appToken)
+        NSLog("[DoubaoVoice] configure STRING  resource_id        = %@", config.resourceId)
+        engine.setStringParam(config.resourceId, forKey: SDKKey.resourceId)
+        engine.setStringParam(config.uid, forKey: SDKKey.uid)
+        engine.setStringParam(config.dialogAddress, forKey: SDKKey.dialogAddress)
+        engine.setStringParam(config.dialogUri, forKey: SDKKey.dialogUri)
 
         // AEC
-        NSLog("[DoubaoVoice] configure BOOL    PARAMS_KEY_ENABLE_AEC_BOOL = %@", config.enableAec ? "true" : "false")
-        engine.setBoolParam(config.enableAec, forKey: "PARAMS_KEY_ENABLE_AEC_BOOL")
+        NSLog("[DoubaoVoice] configure BOOL    enable_aec         = %@", config.enableAec ? "true" : "false")
+        engine.setBoolParam(config.enableAec, forKey: SDKKey.enableAec)
         if config.enableAec, let aecModelPath = config.aecModelPath {
-            engine.setStringParam(aecModelPath, forKey: "PARAMS_KEY_AEC_MODEL_PATH_STRING")
+            engine.setStringParam(aecModelPath, forKey: SDKKey.aecModelPath)
         }
 
         // 录音机
-        engine.setStringParam(config.recorderType, forKey: "PARAMS_KEY_RECORDER_TYPE_STRING")
+        engine.setStringParam(config.recorderType, forKey: SDKKey.recorderDataSourceType)
         if let recorderPath = config.recorderPath {
-            engine.setStringParam(recorderPath, forKey: "PARAMS_KEY_DIALOG_RECORDER_PATH_STRING")
+            engine.setStringParam(recorderPath, forKey: SDKKey.dialogRecorderPath)
         }
-        engine.setBoolParam(config.enableRecorderAudioCallback, forKey: "PARAMS_KEY_DIALOG_ENABLE_RECORDER_AUDIO_CALLBACK_BOOL")
+        engine.setBoolParam(config.enableRecorderAudioCallback, forKey: SDKKey.dialogEnableRecorderAudioCB)
 
         // 播放器
-        NSLog("[DoubaoVoice] configure BOOL    PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL = %@", config.enablePlayer ? "true" : "false")
-        engine.setBoolParam(config.enablePlayer, forKey: "PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL")
-        engine.setBoolParam(config.enablePlayerAudioCallback, forKey: "PARAMS_KEY_DIALOG_ENABLE_PLAYER_AUDIO_CALLBACK_BOOL")
-        engine.setBoolParam(config.enableDecoderAudioCallback, forKey: "PARAMS_KEY_DIALOG_ENABLE_DECODER_AUDIO_CALLBACK_BOOL")
+        NSLog("[DoubaoVoice] configure BOOL    dialog_enable_player = %@", config.enablePlayer ? "true" : "false")
+        engine.setBoolParam(config.enablePlayer, forKey: SDKKey.dialogEnablePlayer)
+        engine.setBoolParam(config.enablePlayerAudioCallback, forKey: SDKKey.dialogEnablePlayerAudioCB)
+        engine.setBoolParam(config.enableDecoderAudioCallback, forKey: SDKKey.dialogEnableDecoderAudioCB)
         if let playerPath = config.playerPath {
-            engine.setStringParam(playerPath, forKey: "PARAMS_KEY_DIALOG_PLAYER_PATH_STRING")
+            engine.setStringParam(playerPath, forKey: SDKKey.dialogPlayerPath)
         }
 
         // 工作模式（仅在非默认模式时设置）
         if let workMode = config.dialogWorkMode {
-            NSLog("[DoubaoVoice] configure INT     PARAMS_KEY_DIALOG_WORK_MODE_INT = %d", workMode)
-            engine.setIntParam(Int(workMode), forKey: "PARAMS_KEY_DIALOG_WORK_MODE_INT")
+            NSLog("[DoubaoVoice] configure INT     dialog_work_mode   = %d", workMode)
+            engine.setIntParam(Int(workMode), forKey: SDKKey.dialogWorkMode)
         }
 
         // 重采样
-        engine.setBoolParam(config.enableResampler, forKey: "PARAMS_KEY_ENABLE_RESAMPLER_BOOL")
+        engine.setBoolParam(config.enableResampler, forKey: SDKKey.enableResampler)
         if config.enableResampler {
             if let sampleRate = config.customSampleRate {
-                engine.setIntParam(Int(sampleRate), forKey: "PARAMS_KEY_CUSTOM_SAMPLE_RATE_INT")
+                engine.setIntParam(Int(sampleRate), forKey: SDKKey.customSampleRate)
             }
             if let channel = config.customChannel {
-                engine.setIntParam(Int(channel), forKey: "PARAMS_KEY_CUSTOM_CHANNEL_INT")
+                engine.setIntParam(Int(channel), forKey: SDKKey.customChannel)
             }
         }
 
