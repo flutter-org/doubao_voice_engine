@@ -2,182 +2,161 @@ import Flutter
 import UIKit
 import SpeechEngineToB
 
-public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
+/// DoubaoVoiceEnginePlugin — Pigeon 架构
+///
+/// 实现 DoubaoVoiceHostApi 协议处理 Dart 调用，
+/// 使用 DoubaoVoiceFlutterApi 发送事件回调到 Dart 侧。
+public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin, DoubaoVoiceHostApi, SpeechEngineDelegate {
 
-    private var methodChannel: FlutterMethodChannel?
-    private var eventChannel: FlutterEventChannel?
-    private var eventSink: FlutterEventSink?
     private var speechEngine: SpeechEngine?
+    private var flutterApi: DoubaoVoiceFlutterApi?
 
+    // ============================================================
+    // FlutterPlugin 注册
+    // ============================================================
     public static func register(with registrar: FlutterPluginRegistrar) {
         let instance = DoubaoVoiceEnginePlugin()
 
-        let methodChannel = FlutterMethodChannel(
-            name: "doubao_voice_engine/method",
-            binaryMessenger: registrar.messenger()
+        // Pigeon HostApi 注册
+        DoubaoVoiceHostApiSetup.setUp(
+            binaryMessenger: registrar.messenger(),
+            api: instance
         )
-        registrar.addMethodCallDelegate(instance, channel: methodChannel)
-        instance.methodChannel = methodChannel
 
-        let eventChannel = FlutterEventChannel(
-            name: "doubao_voice_engine/event",
-            binaryMessenger: registrar.messenger()
-        )
-        eventChannel.setStreamHandler(instance)
-        instance.eventChannel = eventChannel
+        // FlutterApi 用于发送事件到 Dart
+        instance.flutterApi = DoubaoVoiceFlutterApi(binaryMessenger: registrar.messenger())
     }
 
+    // FlutterPlugin 协议要求实现，但 Pigeon 架构下不再使用 MethodChannel
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-        do {
-            switch call.method {
-            case "prepareEnvironment":
-                handlePrepareEnvironment(result: result)
-            case "createEngine":
-                handleCreateEngine(result: result)
-            case "configure":
-                handleConfigure(call: call, result: result)
-            case "setOptionString":
-                handleSetOptionString(call: call, result: result)
-            case "setOptionBool":
-                handleSetOptionBool(call: call, result: result)
-            case "setOptionInt":
-                handleSetOptionInt(call: call, result: result)
-            case "initEngine":
-                handleInitEngine(result: result)
-            case "sendDirective":
-                handleSendDirective(call: call, result: result)
-            case "feedAudio":
-                handleFeedAudio(call: call, result: result)
-            case "stopEngine":
-                handleStopEngine(result: result)
-            case "destroyEngine":
-                handleDestroyEngine(result: result)
-            default:
-                result(FlutterMethodNotImplemented)
-            }
-        } catch let error {
-            result(FlutterError(code: "ENGINE_ERROR", message: error.localizedDescription, details: nil))
-        }
+        result(FlutterMethodNotImplemented)
     }
 
     // ============================================================
-    // 1. prepareEnvironment
+    // DoubaoVoiceHostApi 实现
     // ============================================================
-    private func handlePrepareEnvironment(result: @escaping FlutterResult) {
+
+    func prepareEnvironment() throws -> Bool {
         let ok = SpeechEngine.prepareEnvironment()
         NSLog("[DoubaoVoice] prepareEnvironment -> %@", ok ? "OK" : "FAILED")
-        result(ok)
+        return ok
     }
 
-    // ============================================================
-    // 2. createEngine
-    // ============================================================
-    private func handleCreateEngine(result: @escaping FlutterResult) {
+    func createEngine() throws {
         let engine = SpeechEngine()
         engine.createEngine(with: self)
         speechEngine = engine
-        result(nil)
+        NSLog("[DoubaoVoice] createEngine -> OK")
     }
 
-    // ============================================================
-    // 3. configure — 批量配置
-    // ============================================================
-    private func handleConfigure(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
-        guard let params = call.arguments as? [String: Any] else {
-            result(FlutterError(code: "INVALID_ARGS", message: "Expected Map", details: nil))
-            return
+    func configure(config: EngineConfigMessage) throws {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
 
-        for (key, value) in params {
-            if let stringValue = value as? String {
-                NSLog("[DoubaoVoice] configure STRING  %@ = %@", key, stringValue)
-                engine.setStringParam(stringValue, forKey: key)
-            } else if let numberValue = value as? NSNumber {
-                // Flutter 传过来的 bool / int 在 iOS 侧都是 NSNumber。
-                // ⚠️ 关键：必须用 CFGetTypeID 区分 CFBoolean 和普通数值 NSNumber，
-                // 否则 (0 as NSNumber) as? Bool → false，所有 int=0 的参数都会被错误当成 Bool。
-                if CFGetTypeID(numberValue) == CFBooleanGetTypeID() {
-                    NSLog("[DoubaoVoice] configure BOOL    %@ = %@", key, numberValue.boolValue ? "true" : "false")
-                    engine.setBoolParam(numberValue.boolValue, forKey: key)
-                } else {
-                    NSLog("[DoubaoVoice] configure INT     %@ = %d", key, numberValue.intValue)
-                    engine.setIntParam(numberValue.intValue, forKey: key)
-                }
+        // 引擎基础
+        engine.setStringParam("DIALOG_ENGINE", forKey: "PARAMS_KEY_ENGINE_NAME_STRING")
+        NSLog("[DoubaoVoice] configure STRING  PARAMS_KEY_ENGINE_NAME_STRING = DIALOG_ENGINE")
+        engine.setStringParam(config.logLevel, forKey: "PARAMS_KEY_LOG_LEVEL_STRING")
+        if let debugPath = config.debugPath {
+            engine.setStringParam(debugPath, forKey: "PARAMS_KEY_DEBUG_PATH_STRING")
+        }
+
+        // 鉴权
+        NSLog("[DoubaoVoice] configure STRING  PARAMS_KEY_APP_ID_STRING = %@", config.appId)
+        engine.setStringParam(config.appId, forKey: "PARAMS_KEY_APP_ID_STRING")
+        engine.setStringParam(config.appKey, forKey: "PARAMS_KEY_APP_KEY_STRING")
+        engine.setStringParam(config.appToken, forKey: "PARAMS_KEY_APP_TOKEN_STRING")
+        NSLog("[DoubaoVoice] configure STRING  PARAMS_KEY_RESOURCE_ID_STRING = %@", config.resourceId)
+        engine.setStringParam(config.resourceId, forKey: "PARAMS_KEY_RESOURCE_ID_STRING")
+        engine.setStringParam(config.uid, forKey: "PARAMS_KEY_UID_STRING")
+        engine.setStringParam(config.dialogAddress, forKey: "PARAMS_KEY_DIALOG_ADDRESS_STRING")
+        engine.setStringParam(config.dialogUri, forKey: "PARAMS_KEY_DIALOG_URI_STRING")
+
+        // AEC
+        NSLog("[DoubaoVoice] configure BOOL    PARAMS_KEY_ENABLE_AEC_BOOL = %@", config.enableAec ? "true" : "false")
+        engine.setBoolParam(config.enableAec, forKey: "PARAMS_KEY_ENABLE_AEC_BOOL")
+        if config.enableAec, let aecModelPath = config.aecModelPath {
+            engine.setStringParam(aecModelPath, forKey: "PARAMS_KEY_AEC_MODEL_PATH_STRING")
+        }
+
+        // 录音机
+        engine.setStringParam(config.recorderType, forKey: "PARAMS_KEY_RECORDER_TYPE_STRING")
+        if let recorderPath = config.recorderPath {
+            engine.setStringParam(recorderPath, forKey: "PARAMS_KEY_DIALOG_RECORDER_PATH_STRING")
+        }
+        engine.setBoolParam(config.enableRecorderAudioCallback, forKey: "PARAMS_KEY_DIALOG_ENABLE_RECORDER_AUDIO_CALLBACK_BOOL")
+
+        // 播放器
+        NSLog("[DoubaoVoice] configure BOOL    PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL = %@", config.enablePlayer ? "true" : "false")
+        engine.setBoolParam(config.enablePlayer, forKey: "PARAMS_KEY_DIALOG_ENABLE_PLAYER_BOOL")
+        engine.setBoolParam(config.enablePlayerAudioCallback, forKey: "PARAMS_KEY_DIALOG_ENABLE_PLAYER_AUDIO_CALLBACK_BOOL")
+        engine.setBoolParam(config.enableDecoderAudioCallback, forKey: "PARAMS_KEY_DIALOG_ENABLE_DECODER_AUDIO_CALLBACK_BOOL")
+        if let playerPath = config.playerPath {
+            engine.setStringParam(playerPath, forKey: "PARAMS_KEY_DIALOG_PLAYER_PATH_STRING")
+        }
+
+        // 工作模式（仅在非默认模式时设置）
+        if let workMode = config.dialogWorkMode {
+            NSLog("[DoubaoVoice] configure INT     PARAMS_KEY_DIALOG_WORK_MODE_INT = %d", workMode)
+            engine.setIntParam(Int32(workMode), forKey: "PARAMS_KEY_DIALOG_WORK_MODE_INT")
+        }
+
+        // 重采样
+        engine.setBoolParam(config.enableResampler, forKey: "PARAMS_KEY_ENABLE_RESAMPLER_BOOL")
+        if config.enableResampler {
+            if let sampleRate = config.customSampleRate {
+                engine.setIntParam(Int32(sampleRate), forKey: "PARAMS_KEY_CUSTOM_SAMPLE_RATE_INT")
+            }
+            if let channel = config.customChannel {
+                engine.setIntParam(Int32(channel), forKey: "PARAMS_KEY_CUSTOM_CHANNEL_INT")
             }
         }
-        NSLog("[DoubaoVoice] configure done — %d params set", params.count)
-        result(nil)
+
+        NSLog("[DoubaoVoice] configure done")
     }
 
-    // ============================================================
-    // setOptionString / setOptionBool / setOptionInt
-    // ============================================================
-    private func handleSetOptionString(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let key = args["key"] as? String,
-              let value = args["value"] as? String else {
-            result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
-            return
+    func setOptionString(key: String, value: String) throws {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
         engine.setStringParam(value, forKey: key)
-        result(nil)
     }
 
-    private func handleSetOptionBool(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let key = args["key"] as? String,
-              let value = args["value"] as? Bool else {
-            result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
-            return
+    func setOptionBool(key: String, value: Bool) throws {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
         engine.setBoolParam(value, forKey: key)
-        result(nil)
     }
 
-    private func handleSetOptionInt(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let key = args["key"] as? String,
-              let value = args["value"] as? Int else {
-            result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
-            return
+    func setOptionInt(key: String, value: Int64) throws {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
-        engine.setIntParam(value, forKey: key)
-        result(nil)
+        engine.setIntParam(Int32(value), forKey: key)
     }
 
-    // ============================================================
-    // 4. initEngine
-    // ============================================================
-    private func handleInitEngine(result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
+    func initEngine() throws -> Int64 {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
+        }
         let ret = engine.initEngine()
         if ret.rawValue != SENoError.rawValue {
             NSLog("[DoubaoVoice] initEngine FAILED — error code: %d (0x%X)", ret.rawValue, ret.rawValue)
-            result(Int(ret.rawValue))
-        } else {
-            NSLog("[DoubaoVoice] initEngine SUCCESS")
-            result(0)
+            return Int64(ret.rawValue)
         }
+        NSLog("[DoubaoVoice] initEngine SUCCESS")
+        return 0
     }
 
-    // ============================================================
-    // 5. sendDirective
-    // ============================================================
-    private func handleSendDirective(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
-        guard let args = call.arguments as? [String: Any],
-              let directiveStr = args["directive"] as? String else {
-            result(FlutterError(code: "INVALID_ARGS", message: nil, details: nil))
-            return
+    func sendDirective(request: DirectiveRequest) throws {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
 
-        let dataStr = args["data"] as? String ?? ""
-        let directive = resolveDirective(directiveStr)
-        let data = dataStr.data(using: .utf8) ?? Data()
+        let directive = resolveDirective(request.directive)
+        let dataStr = request.data ?? ""
 
         let ret: SEEngineErrorCode
         if dataStr.isEmpty {
@@ -187,85 +166,121 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         }
 
         if ret != SENoError {
-            result(FlutterError(code: "DIRECTIVE_FAILED",
-                                message: "send returned \(ret.rawValue)",
-                                details: nil))
-        } else {
-            result(nil)
+            throw PigeonError(code: "DIRECTIVE_FAILED", message: "send returned \(ret.rawValue)", details: nil)
         }
     }
 
-    // ============================================================
-    // 6. feedAudio
-    // ============================================================
-    private func handleFeedAudio(call: FlutterMethodCall, result: @escaping FlutterResult) {
-        guard let engine = requireEngine(result: result) else { return }
-
-        guard let audioData = call.arguments as? FlutterStandardTypedData else {
-            result(FlutterError(code: "INVALID_AUDIO", message: "Expected Uint8List", details: nil))
-            return
+    func feedAudio(buffer: FlutterStandardTypedData) throws -> Int64 {
+        guard let engine = speechEngine else {
+            throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
 
-        let bytes = audioData.data
+        let bytes = buffer.data
         let int16Count = bytes.count / 2
         var int16Array = [Int16](repeating: 0, count: int16Count)
-        int16Array.withUnsafeMutableBufferPointer { buffer in
-            bytes.copyBytes(to: buffer)
+        int16Array.withUnsafeMutableBufferPointer { ptr in
+            bytes.copyBytes(to: ptr)
         }
 
-        let ret = int16Array.withUnsafeMutableBufferPointer { buffer in
-            engine.feedAudio(buffer.baseAddress!, length: Int32(int16Count))
+        let ret = int16Array.withUnsafeMutableBufferPointer { ptr in
+            engine.feedAudio(ptr.baseAddress!, length: Int32(int16Count))
         }
-        result(Int(ret.rawValue))
+        return Int64(ret.rawValue)
     }
 
-    // ============================================================
-    // stopEngine
-    // ============================================================
-    private func handleStopEngine(result: @escaping FlutterResult) {
+    func stopEngine(completion: @escaping (Result<Void, Error>) -> Void) {
         guard let engine = speechEngine else {
-            result(nil)
+            completion(.success(()))
             return
         }
         // 异步执行以避免回调线程死锁
         DispatchQueue.global().async {
             _ = engine.send(SEDirectiveSyncStopEngine)
             DispatchQueue.main.async {
-                result(nil)
+                completion(.success(()))
             }
         }
     }
 
-    // ============================================================
-    // destroyEngine
-    // ============================================================
-    private func handleDestroyEngine(result: @escaping FlutterResult) {
-        destroyEngineInternal()
-        result(nil)
-    }
-
-    private func destroyEngineInternal() {
-        guard let engine = speechEngine else { return }
+    func destroyEngine(completion: @escaping (Result<Void, Error>) -> Void) {
+        guard let engine = speechEngine else {
+            completion(.success(()))
+            return
+        }
         DispatchQueue.global().async {
             _ = engine.send(SEDirectiveSyncStopEngine)
             engine.destroy()
+            DispatchQueue.main.async {
+                completion(.success(()))
+            }
         }
         speechEngine = nil
     }
 
     // ============================================================
-    // SpeechEngine 回调 — 将所有事件桥接到 EventChannel
+    // SpeechEngineDelegate — SDK 回调，通过 Pigeon FlutterApi 发送到 Dart
     // ============================================================
-    private func sendEvent(type: String, text: String? = nil, audio: Data? = nil) {
-        var eventMap: [String: Any] = ["type": type]
-        if let text = text {
-            eventMap["text"] = text
+    public func onMessage(with type: SEMessageType, andData data: Data) {
+        let event: EngineEventMessage?
+
+        switch type {
+        case SEEngineStart:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_ENGINE_START", text: text)
+
+        case SEEngineStop:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_ENGINE_STOP", text: text)
+
+        case SEEngineError:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_ENGINE_ERROR", text: text)
+
+        case SEDialogASRInfo:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DIALOG_ASR_INFO", text: text)
+
+        case SEDialogASRResponse:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DIALOG_ASR_RESPONSE", text: text)
+
+        case SEDialogASREnded:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DIALOG_ASR_ENDED", text: text)
+
+        case SEDialogChatResponse:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DIALOG_CHAT_RESPONSE", text: text)
+
+        case SEDialogChatEnded:
+            let text = String(data: data, encoding: .utf8)
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DIALOG_CHAT_ENDED", text: text)
+
+        case SEDialogPlayerAudio:
+            event = EngineEventMessage(type: "MESSAGE_TYPE_PLAYER_AUDIO_DATA", audio: FlutterStandardTypedData(bytes: data))
+
+        case SEDecoderAudioData:
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DECODER_AUDIO_DATA", audio: FlutterStandardTypedData(bytes: data))
+
+        case SEDialogRecorderAudio:
+            event = EngineEventMessage(type: "MESSAGE_TYPE_DIALOG_RECORDER_AUDIO", audio: FlutterStandardTypedData(bytes: data))
+
+        default:
+            event = nil
         }
-        if let audio = audio {
-            eventMap["audio"] = FlutterStandardTypedData(bytes: audio)
-        }
+
+        guard let event = event else { return }
+
+        // 通过 Pigeon FlutterApi 发送事件到 Dart
         DispatchQueue.main.async { [weak self] in
-            self?.eventSink?(eventMap)
+            self?.flutterApi?.onEngineEvent(event: event) { result in
+                switch result {
+                case .failure(let error):
+                    NSLog("[DoubaoVoice] FlutterApi onEngineEvent failed: %@", error.localizedDescription)
+                case .success:
+                    break
+                }
+            }
         }
     }
 
@@ -290,83 +305,5 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin {
         case "DIRECTIVE_RESUME_RECORDER":            return SEDirectiveResumeRecorder
         default: return SEDirectiveSyncStopEngine
         }
-    }
-
-    private func requireEngine(result: @escaping FlutterResult) -> SpeechEngine? {
-        guard let engine = speechEngine else {
-            result(FlutterError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil))
-            return nil
-        }
-        return engine
-    }
-}
-
-// ============================================================
-// SpeechEngineDelegate — 回调实现
-// ============================================================
-extension DoubaoVoiceEnginePlugin: SpeechEngineDelegate {
-
-    public func onMessage(with type: SEMessageType, andData data: Data) {
-        switch type {
-        case SEEngineStart:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_ENGINE_START", text: text)
-
-        case SEEngineStop:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_ENGINE_STOP", text: text)
-
-        case SEEngineError:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_ENGINE_ERROR", text: text)
-
-        case SEDialogASRInfo:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_DIALOG_ASR_INFO", text: text)
-
-        case SEDialogASRResponse:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_DIALOG_ASR_RESPONSE", text: text)
-
-        case SEDialogASREnded:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_DIALOG_ASR_ENDED", text: text)
-
-        case SEDialogChatResponse:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_DIALOG_CHAT_RESPONSE", text: text)
-
-        case SEDialogChatEnded:
-            let text = String(data: data, encoding: .utf8)
-            sendEvent(type: "MESSAGE_TYPE_DIALOG_CHAT_ENDED", text: text)
-
-        case SEDialogPlayerAudio:
-            sendEvent(type: "MESSAGE_TYPE_PLAYER_AUDIO_DATA", audio: data)
-
-        case SEDecoderAudioData:
-            sendEvent(type: "MESSAGE_TYPE_DECODER_AUDIO_DATA", audio: data)
-
-        case SEDialogRecorderAudio:
-            sendEvent(type: "MESSAGE_TYPE_DIALOG_RECORDER_AUDIO", audio: data)
-
-        default:
-            break
-        }
-    }
-}
-
-// ============================================================
-// FlutterStreamHandler — EventChannel 管理
-// ============================================================
-extension DoubaoVoiceEnginePlugin: FlutterStreamHandler {
-
-    public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
-        eventSink = events
-        return nil
-    }
-
-    public func onCancel(withArguments arguments: Any?) -> FlutterError? {
-        eventSink = nil
-        return nil
     }
 }

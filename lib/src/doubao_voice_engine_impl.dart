@@ -1,15 +1,16 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
+import 'messages.g.dart';
 import 'models/voice_engine_config.dart';
 import 'models/voice_engine_defines.dart';
 import 'models/voice_engine_event.dart';
 
 /// 豆包语音端到端实时语音大模型 Flutter 插件
 ///
-/// 基于 MethodChannel/EventChannel 封装 Android/iOS 原生 SDK，
+/// 基于 Pigeon 生成的类型安全平台通道封装 Android/iOS 原生 SDK，
 /// 提供低延迟、双向流式语音交互能力。
 ///
 /// 使用示例：
@@ -58,30 +59,19 @@ import 'models/voice_engine_event.dart';
 /// await engine.stopEngine();
 /// await engine.destroyEngine();
 /// ```
-class DoubaoVoiceEngine {
-  DoubaoVoiceEngine._();
+class DoubaoVoiceEngine implements DoubaoVoiceFlutterApi {
+  DoubaoVoiceEngine._() {
+    // 注册 FlutterApi 接收 Native 事件回调
+    DoubaoVoiceFlutterApi.setUp(this);
+  }
 
   static final DoubaoVoiceEngine _instance = DoubaoVoiceEngine._();
   static DoubaoVoiceEngine get instance => _instance;
 
-  static const String _methodChannelName = 'doubao_voice_engine/method';
-  static const String _eventChannelName = 'doubao_voice_engine/event';
+  /// Pigeon 生成的 HostApi — Dart 调用 Native
+  final _hostApi = DoubaoVoiceHostApi();
 
-  // Method names
-  static const String methodPrepareEnvironment = 'prepareEnvironment';
-  static const String methodCreateEngine = 'createEngine';
-  static const String methodSetOptionString = 'setOptionString';
-  static const String methodSetOptionBool = 'setOptionBool';
-  static const String methodSetOptionInt = 'setOptionInt';
-  static const String methodInitEngine = 'initEngine';
-  static const String methodSendDirective = 'sendDirective';
-  static const String methodFeedAudio = 'feedAudio';
-  static const String methodDestroyEngine = 'destroyEngine';
-
-  MethodChannel? _methodChannel;
-  EventChannel? _eventChannel;
-  StreamSubscription? _eventSubscription;
-
+  /// 事件流控制器
   final _eventController = StreamController<VoiceEngineEvent>.broadcast();
 
   bool _isInitialized = false;
@@ -97,37 +87,34 @@ class DoubaoVoiceEngine {
   bool get isInitialized => _isInitialized;
 
   // ============================================================
-  // 平台通道初始化
+  // DoubaoVoiceFlutterApi 实现 — 接收 Native 事件
   // ============================================================
 
-  MethodChannel get _channel {
-    _methodChannel ??= const MethodChannel(_methodChannelName);
-    return _methodChannel!;
-  }
-
-  void _initEventChannel() {
-    _eventChannel ??= const EventChannel(_eventChannelName);
-    _eventSubscription?.cancel();
-    _eventSubscription = _eventChannel!
-        .receiveBroadcastStream()
-        .listen(_onEventData, onError: _onEventError);
-  }
-
-  void _onEventData(dynamic data) {
+  @override
+  void onEngineEvent(EngineEventMessage event) {
     try {
-      if (data is Map) {
-        final event = VoiceEngineEvent.fromMap(
-          Map<String, dynamic>.from(data),
-        );
-        _eventController.add(event);
+      final type = _parseEventType(event.type);
+      if (type == null) {
+        debugPrint('DoubaoVoiceEngine: unknown event type: ${event.type}');
+        return;
       }
+      _eventController.add(VoiceEngineEvent(
+        type: type,
+        text: event.text,
+        audio: event.audio != null ? List<int>.from(event.audio!) : null,
+      ));
     } catch (e) {
-      debugPrint('DoubaoVoiceEngine: error parsing event data: $e');
+      debugPrint('DoubaoVoiceEngine: error parsing event: $e');
     }
   }
 
-  void _onEventError(dynamic error) {
-    debugPrint('DoubaoVoiceEngine: event error: $error');
+  VoiceEngineEventType? _parseEventType(String typeStr) {
+    return eventTypeStrings.entries
+        .firstWhere(
+          (e) => e.value == typeStr,
+          orElse: () => const MapEntry(VoiceEngineEventType.engineError, ''),
+        )
+        .key;
   }
 
   // ============================================================
@@ -137,15 +124,22 @@ class DoubaoVoiceEngine {
   /// 初始化环境依赖，创建引擎实例前调用。
   /// 整个 App 生命周期内**仅需执行一次**。
   Future<void> prepareEnvironment() async {
-    final ok = await _channel.invokeMethod<bool>(methodPrepareEnvironment);
-    if (ok != true) {
+    try {
+      final ok = await _hostApi.prepareEnvironment();
+      if (!ok) {
+        throw PlatformException(
+          code: 'PREPARE_FAILED',
+          message: '环境准备失败。请检查：\n'
+              '1. App 是否已完成火山引擎鉴权配置\n'
+              '2. 网络权限是否已开启\n'
+              '3. iOS: pod install 是否使用了 --repo-update\n'
+              '4. Android: AndroidManifest.xml 是否声明了 INTERNET 权限',
+        );
+      }
+    } on PlatformException catch (e) {
       throw PlatformException(
         code: 'PREPARE_FAILED',
-        message: '环境准备失败。请检查：\n'
-            '1. App 是否已完成火山引擎鉴权配置\n'
-            '2. 网络权限是否已开启\n'
-            '3. iOS: pod install 是否使用了 --repo-update\n'
-            '4. Android: AndroidManifest.xml 是否声明了 INTERNET 权限',
+        message: '环境准备失败: ${e.message}',
       );
     }
   }
@@ -157,8 +151,7 @@ class DoubaoVoiceEngine {
   /// 创建引擎实例。
   /// 调用前需先执行 [prepareEnvironment]。
   Future<void> createEngine() async {
-    await _channel.invokeMethod(methodCreateEngine);
-    _initEventChannel();
+    await _hostApi.createEngine();
   }
 
   // ============================================================
@@ -182,38 +175,54 @@ class DoubaoVoiceEngine {
       );
     }
 
-    final paramMap = config.toParamMap();
-    debugPrint('DoubaoVoiceEngine: configure() — ${paramMap.length} params');
-    // 脱敏打印关键鉴权参数
-    final safeMap = Map<String, dynamic>.from(paramMap);
-    safeMap['PARAMS_KEY_APP_KEY_STRING'] = '***';
-    safeMap['PARAMS_KEY_APP_TOKEN_STRING'] = '***';
-    debugPrint('DoubaoVoiceEngine: params = $safeMap');
-    await _channel.invokeMethod('configure', paramMap);
+    // 构建 Pigeon 消息
+    final message = EngineConfigMessage(
+      appId: config.appId,
+      appKey: config.appKey,
+      appToken: config.appToken,
+      resourceId: config.resourceId,
+      uid: config.uid,
+      dialogAddress: config.dialogAddress,
+      dialogUri: config.dialogUri,
+      debugPath: config.debugPath,
+      logLevel: config.logLevel,
+      enableAec: config.enableAec,
+      aecModelPath: config.aecModelPath,
+      recorderType: config.recorderType,
+      recorderPath: config.recorderPath,
+      enableRecorderAudioCallback: config.enableRecorderAudioCallback,
+      enablePlayer: config.enablePlayer,
+      enablePlayerAudioCallback: config.enablePlayerAudioCallback,
+      enableDecoderAudioCallback: config.enableDecoderAudioCallback,
+      playerPath: config.playerPath,
+      dialogWorkMode: config.dialogWorkMode != dialogWorkModeDefault
+          ? config.dialogWorkMode
+          : null,
+      enableResampler: config.enableResampler,
+      customSampleRate: config.enableResampler ? config.customSampleRate : null,
+      customChannel: config.enableResampler ? config.customChannel : null,
+    );
+
+    debugPrint('DoubaoVoiceEngine: configure() — appId=${config.appId}, '
+        'resourceId=${config.resourceId}, uid=${config.uid}, '
+        'logLevel=${config.logLevel}');
+
+    await _hostApi.configure(message);
   }
 
   /// 设置字符串参数
   Future<void> setOptionString(String key, String value) async {
-    await _channel.invokeMethod(methodSetOptionString, {
-      'key': key,
-      'value': value,
-    });
+    await _hostApi.setOptionString(key, value);
   }
 
   /// 设置布尔参数
   Future<void> setOptionBool(String key, bool value) async {
-    await _channel.invokeMethod(methodSetOptionBool, {
-      'key': key,
-      'value': value,
-    });
+    await _hostApi.setOptionBool(key, value);
   }
 
   /// 设置整数参数
   Future<void> setOptionInt(String key, int value) async {
-    await _channel.invokeMethod(methodSetOptionInt, {
-      'key': key,
-      'value': value,
-    });
+    await _hostApi.setOptionInt(key, value);
   }
 
   // ============================================================
@@ -224,9 +233,9 @@ class DoubaoVoiceEngine {
   /// 调用前需完成参数配置。
   Future<void> initEngine() async {
     debugPrint('DoubaoVoiceEngine: calling initEngine...');
-    final result = await _channel.invokeMethod<int>(methodInitEngine);
+    final result = await _hostApi.initEngine();
     debugPrint('DoubaoVoiceEngine: initEngine returned $result');
-    if (result != null && result != 0) {
+    if (result != 0) {
       debugPrint('DoubaoVoiceEngine: INIT FAILED with code $result');
       final tips = _buildInitErrorTips(result);
       throw PlatformException(
@@ -355,7 +364,7 @@ class DoubaoVoiceEngine {
   ///
   /// ⚠️ 不可在事件回调线程中调用！
   Future<void> stopEngine() async {
-    await _channel.invokeMethod('stopEngine');
+    await _hostApi.stopEngine();
   }
 
   /// 发送自定义指令（高级用法）。
@@ -368,10 +377,10 @@ class DoubaoVoiceEngine {
 
   Future<void> _sendDirective(VoiceDirective directive, {String? data}) async {
     final directiveStr = directiveStrings[directive]!;
-    await _channel.invokeMethod(methodSendDirective, {
-      'directive': directiveStr,
-      'data': data ?? '',
-    });
+    await _hostApi.sendDirective(DirectiveRequest(
+      directive: directiveStr,
+      data: data,
+    ));
   }
 
   // ============================================================
@@ -385,7 +394,7 @@ class DoubaoVoiceEngine {
   /// - 采样率：16kHz（如不是可开启内部重采样）
   /// - 通道数：1（单声道）
   Future<void> feedAudio(Uint8List buffer) async {
-    await _channel.invokeMethod(methodFeedAudio, buffer);
+    await _hostApi.feedAudio(buffer);
   }
 
   // ============================================================
@@ -396,17 +405,14 @@ class DoubaoVoiceEngine {
   ///
   /// ⚠️ 不可在事件回调线程中调用！
   Future<void> destroyEngine() async {
-    await _channel.invokeMethod(methodDestroyEngine);
+    await _hostApi.destroyEngine();
     _isInitialized = false;
   }
 
   /// 释放所有资源。
   Future<void> dispose() async {
-    await _eventSubscription?.cancel();
-    _eventSubscription = null;
     await _eventController.close();
-    _methodChannel = null;
-    _eventChannel = null;
+    DoubaoVoiceFlutterApi.setUp(null);
     _isInitialized = false;
   }
 

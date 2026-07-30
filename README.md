@@ -10,6 +10,49 @@
 | Android | API 19 (Android 4.4) | speechengine_tob 0.0.14.7 |
 | iOS | iOS 12.0 | SpeechEngineToB 0.0.14.7 |
 
+## 架构
+
+本插件使用 [Pigeon](https://pub.dev/packages/pigeon) 生成类型安全的平台通道代码，替代手写 `MethodChannel`/`EventChannel`：
+
+```
+┌─────────────────────────────────────────────┐
+│  Dart (lib/)                                 │
+│  ┌──────────────┐  ┌──────────────────────┐ │
+│  │ DoubaoVoice  │  │ DoubaoVoiceHostApi   │ │  Dart 调用 Native
+│  │ Engine       │──│ (Pigeon 生成)         │ │
+│  │ (公开 API)    │  └──────────────────────┘ │
+│  │              │  ┌──────────────────────┐ │
+│  │              │  │ DoubaoVoiceFlutterApi│ │  Native 调用 Dart
+│  │              │──│ (实现 onEngineEvent)  │ │
+│  └──────────────┘  └──────────────────────┘ │
+└──────────────────────┬──────────────────────┘
+                       │ Pigeon 自动编解码
+┌──────────────────────┴──────────────────────┐
+│  Android (Kotlin)          iOS (Swift)       │
+│  ┌──────────────────┐      ┌──────────────┐  │
+│  │ DoubaoVoiceHost  │      │ DoubaoVoice  │  │
+│  │ Api 实现          │      │ HostApi 实现  │  │
+│  │ + FlutterApi     │      │ + FlutterApi │  │
+│  │   发送事件        │      │   发送事件    │  │
+│  └────────┬─────────┘      └──────┬───────┘  │
+│           │ SpeechEngine SDK      │ SpeechEngineToB │
+└───────────┴───────────────┴───────┴──────────┘
+```
+
+### 代码生成
+
+平台接口由 `pigeons/messages.dart` 定义，修改后运行：
+
+```bash
+cd doubao_voice_engine
+dart run pigeon --input pigeons/messages.dart
+```
+
+生成文件（**请勿手动编辑**）：
+- `lib/src/messages.g.dart` — Dart 类型安全接口
+- `android/.../Messages.g.kt` — Kotlin 接口和数据类
+- `ios/Classes/Messages.g.swift` — Swift 协议和结构体
+
 ## 安装
 
 ```yaml

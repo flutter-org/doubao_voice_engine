@@ -140,7 +140,7 @@ const Map<VoiceEngineEventType, String> eventTypeStrings = {
   VoiceEngineEventType.recorderAudio: 'MESSAGE_TYPE_DIALOG_RECORDER_AUDIO',
 };
 
-/// Native 方法名常量
+/// Native 方法名常量（Pigeon 自动管理，此处保留仅向后兼容）
 const String methodPrepareEnvironment = 'prepareEnvironment';
 const String methodCreateEngine = 'createEngine';
 const String methodSetOptionString = 'setOptionString';
