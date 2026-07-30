@@ -99,17 +99,17 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin, DoubaoVoiceHostAp
         // 工作模式（仅在非默认模式时设置）
         if let workMode = config.dialogWorkMode {
             NSLog("[DoubaoVoice] configure INT     PARAMS_KEY_DIALOG_WORK_MODE_INT = %d", workMode)
-            engine.setIntParam(Int32(workMode), forKey: "PARAMS_KEY_DIALOG_WORK_MODE_INT")
+            engine.setIntParam(Int(workMode), forKey: "PARAMS_KEY_DIALOG_WORK_MODE_INT")
         }
 
         // 重采样
         engine.setBoolParam(config.enableResampler, forKey: "PARAMS_KEY_ENABLE_RESAMPLER_BOOL")
         if config.enableResampler {
             if let sampleRate = config.customSampleRate {
-                engine.setIntParam(Int32(sampleRate), forKey: "PARAMS_KEY_CUSTOM_SAMPLE_RATE_INT")
+                engine.setIntParam(Int(sampleRate), forKey: "PARAMS_KEY_CUSTOM_SAMPLE_RATE_INT")
             }
             if let channel = config.customChannel {
-                engine.setIntParam(Int32(channel), forKey: "PARAMS_KEY_CUSTOM_CHANNEL_INT")
+                engine.setIntParam(Int(channel), forKey: "PARAMS_KEY_CUSTOM_CHANNEL_INT")
             }
         }
 
@@ -134,7 +134,7 @@ public class DoubaoVoiceEnginePlugin: NSObject, FlutterPlugin, DoubaoVoiceHostAp
         guard let engine = speechEngine else {
             throw PigeonError(code: "ENGINE_NOT_CREATED", message: "请先调用 createEngine()", details: nil)
         }
-        engine.setIntParam(Int32(value), forKey: key)
+        engine.setIntParam(Int(value), forKey: key)
     }
 
     func initEngine() throws -> Int64 {
